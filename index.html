@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>滑塊×消除×戰鬥 Prototype</title>
+    <title>滑塊×消除×戰鬥 Prototype v11</title>
     <style>
         body {
             background-color: #2c3e50;
@@ -14,7 +14,6 @@
             align-items: center;
             margin: 0;
             padding: 15px;
-            /* 防止手機上滑動拉扯畫面 */
             overflow-x: hidden;
             touch-action: manipulation;
         }
@@ -117,7 +116,6 @@
             border-radius: 20px;
         }
         
-        /* 📱 手機專用虛擬按鍵區 */
         #dpad-container {
             display: grid;
             grid-template-columns: repeat(3, 75px);
@@ -140,10 +138,8 @@
             align-items: center;
             box-shadow: 0 5px #2c3e50;
             cursor: pointer;
-            /* 關鍵：防止按鈕觸發手機連點放大或選取 */
             touch-action: manipulation; 
         }
-        /* 按下時的視覺反饋 */
         .dpad-btn:active {
             background-color: #1abc9c;
             border-color: #16a085;
@@ -201,7 +197,6 @@
         .danger-text { color: #e74c3c; font-weight: bold; }
         .safe-text { color: #00d2ff; font-weight: bold; }
 
-	/* ✍️ 作者資訊區塊樣式 */
         .creator {
             margin-top: 30px;
             margin-bottom: 20px;
@@ -209,18 +204,13 @@
             max-width: 500px;
             text-align: center;
             font-size: 13px;
-            color: #7f8c8d; /* 內斂的灰色 */
-            border-top: 1px solid rgba(127, 140, 141, 0.3); /* 淡淡的頂部裝飾線 */
+            color: #7f8c8d;
+            border-top: 1px solid rgba(127, 140, 141, 0.3);
             padding-top: 15px;
             letter-spacing: 0.5px;
         }
-        .creator b {
-            color: #ecf0f1; /* 讓名字稍微亮一點 */
-        }
-        .creator .ai-brand {
-            color: #00d2ff; /* Gemini 專屬的科技藍藍框色 */
-            font-weight: bold;
-        }
+        .creator b { color: #ecf0f1; }
+        .creator .ai-brand { color: #00d2ff; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -238,7 +228,6 @@
 
     <div id="game-container">
         <canvas id="gameCanvas" width="500" height="500"></canvas>
-        
         <div id="game-overlay" class="overlay">
             <div id="overlay-title" class="menu-title">滑塊×消除×戰鬥</div>
             <div id="overlay-stats"></div>
@@ -250,23 +239,22 @@
         <div class="dpad-empty"></div>
         <div class="dpad-btn" id="btn-up">▲</div>
         <div class="dpad-empty"></div>
-        
         <div class="dpad-btn" id="btn-left">◀</div>
         <div class="dpad-btn" id="btn-down">▼</div>
         <div class="dpad-btn" id="btn-right">▶</div>
     </div>
 
     <div class="leaderboard-container">
-        <h3>🏆 最佳通關時間 🏆</h3>
+        <h3>🏆 本機最佳通關時間 🏆</h3>
         <ul id="leaderboard-list"></ul>
     </div>
 
     <div class="instructions">
         <ul>
             <li>電腦可用 <b>方向鍵/WASD</b>，手機請點擊下方 <b>虛擬十字鍵</b>。</li>
-            <li><span class="safe-text">【消除】</span>：當已解鎖方塊<b>相連達 2 個以上</b>，會亮起藍框。跨越場景邊界即可消除它們並重創 BOSS！相連越多，傷害越高！</li>
+            <li><span class="safe-text">【消除】</span>：當已解鎖方塊<b>相連達 2 個以上</b>，會亮起藍框。跨越邊界即可消除它們並重創 BOSS！相連越多，傷害越高！</li>
             <li><span class="danger-text">【閃避】</span>：請靈活走位，迅速移出帶有「❌」的危險預告區域！</li>
-            <li>參考左上 <b>小地圖</b>，掌握自己的所在區域吧！</li>
+            <li>參考畫面左上 <b>小地圖</b>，掌握自己的所在區域吧！</li>
         </ul>
     </div>
 
@@ -301,7 +289,9 @@
     let nextGridWarningTime = 0;
     let gridAttackIdx = 0;
     const gridModes = ['vert', 'horiz', 'vert_inv', 'horiz_inv'];
-    let leaderboard = [40000, 50000, 70000];
+
+    // 💾 【修改處 1】初始化排行榜：嘗試從本機讀取，若沒有則使用預設值
+    let leaderboard = JSON.parse(localStorage.getItem('rika_game_leaderboard')) || [40000, 80000, 120000];
 
     function formatTime(ms) {
         let totalSec = Math.floor(ms / 1000);
@@ -499,7 +489,6 @@
         }
     }
 
-    // ⌨️ 電腦鍵盤事件
     let keyLocked = false;
     window.addEventListener('keydown', (e) => {
         if(keyLocked || gameState !== 'PLAYING') return;
@@ -518,12 +507,11 @@
         }
     });
 
-    // 🕹️ 手機虛擬按鍵事件綁定（使用 pointerdown 達到零延遲反應）
     function setupMobileControls() {
         const bindButton = (id, dx, dy) => {
             const btn = document.getElementById(id);
             btn.addEventListener('pointerdown', (e) => {
-                e.preventDefault(); // 防止手機瀏覽器的預設點擊干擾
+                e.preventDefault(); 
                 if (gameState === 'PLAYING') {
                     move(dx, dy);
                 }
@@ -554,6 +542,10 @@
         leaderboard.push(newTimeMs);
         leaderboard.sort((a, b) => a - b);
         if (leaderboard.length > 3) leaderboard.pop();
+        
+        // 💾 【修改處 2】同步寫入本機硬碟保險箱
+        localStorage.setItem('rika_game_leaderboard', JSON.stringify(leaderboard));
+        
         renderLeaderboard();
     }
 
