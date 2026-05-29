@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>滑塊×消除×戰鬥 Prototype v13</title>
+    <title>滑塊×消除×戰鬥 Prototype v15</title>
     <style>
         body {
             background-color: #2c3e50;
@@ -116,40 +116,26 @@
             border-radius: 20px;
         }
         
-        /* 🕹️ 【修改處 1】全新的軸向分離按鍵外框 */
         #dpad-container {
-            display: flex;
-            justify-content: space-between; 
-            align-items: center; /* 讓左邊的橫排與右邊的直排在高度上完美居中對齊 */
+            display: grid;
+            grid-template-columns: repeat(3, 75px);
+            grid-template-rows: repeat(3, 75px);
+            gap: 12px;
+            justify-content: center;
+            align-content: center;
             width: 100%;
             max-width: 500px;
             margin-top: 20px;
-            padding: 0 10px;
-            box-sizing: border-box;
             user-select: none;
             -webkit-user-select: none;
-        }
-        /* 左側群組：橫向 Flex 排列 */
-        .dpad-group-left {
-            display: flex;
-            flex-direction: row;
-            gap: 15px; 
-        }
-        /* 右側群組：縱向相對位置 Flex 排列 */
-        .dpad-group-right {
-            display: flex;
-            flex-direction: column;
-            gap: 10px; /* 上下按鍵的間距 */
-            align-items: center;
+            box-sizing: border-box;
         }
         .dpad-btn {
             background-color: #34495e;
             color: white;
             border: 2px solid #7f8c8d;
             border-radius: 18px;
-            font-size: 30px;
-            width: 75px;
-            height: 75px;
+            font-size: 28px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -162,6 +148,28 @@
             border-color: #16a085;
             transform: translateY(4px);
             box-shadow: 0 2px #2c3e50;
+        }
+
+        #joystick-container {
+            background-color: #2c3e50;
+            border: 2px dashed #7f8c8d;
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            touch-action: none;
+        }
+        #joystick-knob {
+            background-color: #e74c3c;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 4px #c0392b;
+            cursor: pointer;
+            touch-action: none;
         }
 
         .leaderboard-container {
@@ -250,26 +258,30 @@
     </div>
 
     <div id="dpad-container">
-        <div class="dpad-group-left">
-            <div class="dpad-btn" id="btn-left">◀</div>
-            <div class="dpad-btn" id="btn-right">▶</div>
-        </div>
+        <div></div>
+        <div class="dpad-btn" id="btn-up">▲</div>
+        <div></div>
         
-        <div class="dpad-group-right">
-            <div class="dpad-btn" id="btn-up">▲</div>
-            <div class="dpad-btn" id="btn-down">▼</div>
+        <div class="dpad-btn" id="btn-left">◀</div>
+        <div id="joystick-container">
+            <div id="joystick-knob"></div>
         </div>
+        <div class="dpad-btn" id="btn-right">▶</div>
+        
+        <div></div>
+        <div class="dpad-btn" id="btn-down">▼</div>
+        <div></div>
     </div>
 
     <div class="leaderboard-container">
-        <h3>🏆 本機最佳通關時間 排行榜 🏆</h3>
+        <h3>🏆 本機最佳通關時間 🏆</h3>
         <ul id="leaderboard-list"></ul>
     </div>
 
     <div class="instructions">
         <ul>
             <li>電腦可用 <b>方向鍵/WASD</b>。</li>
-            <li>手機請用雙手操作：<b>左手控制水平移動（◀ ▶）</b>，<b>右手控制垂直移動（▲ 下方堆疊 ▼）</b>。</li>
+            <li>手機操作：可輕點外圍的 <b>十字按鍵（▲▼◀▶）</b>，或是直接按住並拖動中央的 <b>紅色虛擬搖桿</b> 來進行連續流暢走位！</li>
             <li><span class="safe-text">【消除】</span>：當已解鎖方塊<b>相連達 2 個以上</b>，會亮起藍框。跨越邊界即可消除它們並重創 BOSS！相連越多，傷害越高！</li>
             <li><span class="danger-text">【閃避】</span>：請靈活走位，迅速移出帶有「❌」的危險預告區域！</li>
             <li>出現 <span class="danger-text">全場地攻擊</span>時，盡快逃出房間吧！可參考畫面左上 <b>小地圖</b>，掌握自己的所在區域！</li>
@@ -307,6 +319,11 @@
     let nextGridWarningTime = 0;
     let gridAttackIdx = 0;
     const gridModes = ['vert', 'horiz', 'vert_inv', 'horiz_inv'];
+
+    let joystickActive = false;
+    let joystickCurX = 0; 
+    let joystickCurY = 0; 
+    let lastJoystickMoveTime = 0;
 
     let leaderboard = JSON.parse(localStorage.getItem('rika_game_leaderboard')) || [60000, 80000, 120000];
 
@@ -538,6 +555,51 @@
         bindButton('btn-down', 0, 1);
         bindButton('btn-left', -1, 0);
         bindButton('btn-right', 1, 0);
+
+        const jContainer = document.getElementById('joystick-container');
+        const jKnob = document.getElementById('joystick-knob');
+        const maxRadius = 24; 
+
+        jContainer.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            joystickActive = true;
+            updateJoystickPosition(e);
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!joystickActive) return;
+            updateJoystickPosition(e);
+        });
+
+        const releaseJoystick = () => {
+            if (!joystickActive) return;
+            joystickActive = false;
+            joystickCurX = 0;
+            joystickCurY = 0;
+            jKnob.style.transform = 'translate(0px, 0px)'; 
+        };
+
+        window.addEventListener('pointerup', releaseJoystick);
+        window.addEventListener('pointercancel', releaseJoystick);
+
+        function updateJoystickPosition(e) {
+            const rect = jContainer.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            let dx = e.clientX - centerX;
+            let dy = e.clientY - centerY;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > maxRadius) {
+                dx = (dx / distance) * maxRadius;
+                dy = (dy / distance) * maxRadius;
+            }
+
+            jKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joystickCurX = dx;
+            joystickCurY = dy;
+        }
     }
 
     function renderLeaderboard() {
@@ -584,6 +646,27 @@
         if(gameState === 'PLAYING') {
             elapsedMs = now - gameStartTime;
             document.getElementById('timer').innerText = formatTime(elapsedMs);
+
+            // 🕹️ 【修改處】傾斜冷卻時間由 110ms 提高至 220ms，移動頻率成功降為一半
+            if (joystickActive) {
+                if (now - lastJoystickMoveTime > 220) { 
+                    let threshold = 8; 
+                    let mx = 0, my = 0;
+                    
+                    if (Math.abs(joystickCurX) > Math.abs(joystickCurY)) {
+                        if (joystickCurX > threshold) mx = 1;
+                        else if (joystickCurX < -threshold) mx = -1;
+                    } else {
+                        if (joystickCurY > threshold) my = 1;
+                        else if (joystickCurY < -threshold) my = -1;
+                    }
+                    
+                    if (mx !== 0 || my !== 0) {
+                        move(mx, my);
+                        lastJoystickMoveTime = now;
+                    }
+                }
+            }
 
             if (now >= nextLocalWarningTime) {
                 warnings.push({
