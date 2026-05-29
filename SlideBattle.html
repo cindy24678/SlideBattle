@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>滑塊×消除×戰鬥 Prototype</title>
+    <style>
+        body {
+            background-color: #2c3e50;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 15px;
+            /* 防止手機上滑動拉扯畫面 */
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1 / 1;
+            margin-top: 5px;
+        }
+        canvas {
+            background-color: #34495e;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border: 2px solid #7f8c8d;
+            width: 100%;
+            height: 100%;
+            display: block;
+            box-sizing: border-box;
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(44, 62, 80, 0.85);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            border: 2px solid #7f8c8d;
+            box-sizing: border-box;
+        }
+        .menu-title {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            color: #f1c40f;
+        }
+        #overlay-stats {
+            font-size: 16px;
+            color: #ecf0f1;
+            margin-bottom: 25px;
+            text-align: center;
+            line-height: 1.5;
+            background: rgba(0,0,0,0.4);
+            padding: 12px 25px;
+            border-radius: 10px;
+            display: none;
+        }
+        .menu-btn {
+            padding: 12px 35px;
+            font-size: 22px;
+            font-weight: bold;
+            color: white;
+            background-color: #2ecc71;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 6px #27ae60;
+            transition: all 0.1s ease;
+        }
+        .menu-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px #27ae60;
+        }
+        .ui-panel {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            box-sizing: border-box;
+        }
+        .hp-bar-container {
+            width: 140px;
+            height: 14px;
+            background-color: #e74c3c;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #c0392b;
+            margin-top: 4px;
+        }
+        .hp-bar-fill {
+            height: 100%;
+            background-color: #2ecc71;
+            transition: width 0.15s;
+        }
+        #timer-display {
+            font-size: 18px;
+            color: #f1c40f;
+            background: rgba(0,0,0,0.3);
+            padding: 3px 12px;
+            border-radius: 20px;
+        }
+        
+        /* 📱 手機專用虛擬按鍵區 */
+        #dpad-container {
+            display: grid;
+            grid-template-columns: repeat(3, 75px);
+            grid-template-rows: repeat(2, 75px);
+            gap: 12px;
+            margin-top: 15px;
+            justify-content: center;
+            width: 100%;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .dpad-btn {
+            background-color: #34495e;
+            color: white;
+            border: 2px solid #7f8c8d;
+            border-radius: 15px;
+            font-size: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 5px #2c3e50;
+            cursor: pointer;
+            /* 關鍵：防止按鈕觸發手機連點放大或選取 */
+            touch-action: manipulation; 
+        }
+        /* 按下時的視覺反饋 */
+        .dpad-btn:active {
+            background-color: #1abc9c;
+            border-color: #16a085;
+            transform: translateY(4px);
+            box-shadow: 0 1px #2c3e50;
+        }
+        .dpad-empty {
+            visibility: hidden;
+        }
+
+        .leaderboard-container {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 500px;
+            background-color: #34495e;
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-sizing: border-box;
+        }
+        .leaderboard-container h3 {
+            margin: 0 0 10px 0;
+            text-align: center;
+            color: #f1c40f;
+            font-size: 16px;
+        }
+        #leaderboard-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #leaderboard-list li {
+            background-color: #2c3e50;
+            margin-bottom: 6px;
+            padding: 8px 12px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        #leaderboard-list li:first-child { color: #f1c40f; }
+        #leaderboard-list li:nth-child(2) { color: #bdc3c7; }
+        #leaderboard-list li:nth-child(3) { color: #cd7f32; }
+        
+        .instructions {
+            margin-top: 15px;
+            width: 100%;
+            max-width: 500px;
+            color: #bdc3c7;
+            line-height: 1.5;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .danger-text { color: #e74c3c; font-weight: bold; }
+        .safe-text { color: #00d2ff; font-weight: bold; }
+
+	/* ✍️ 作者資訊區塊樣式 */
+        .creator {
+            margin-top: 30px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            font-size: 13px;
+            color: #7f8c8d; /* 內斂的灰色 */
+            border-top: 1px solid rgba(127, 140, 141, 0.3); /* 淡淡的頂部裝飾線 */
+            padding-top: 15px;
+            letter-spacing: 0.5px;
+        }
+        .creator b {
+            color: #ecf0f1; /* 讓名字稍微亮一點 */
+        }
+        .creator .ai-brand {
+            color: #00d2ff; /* Gemini 專屬的科技藍藍框色 */
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ui-panel">
+        <div>HP: <span id="player-hp">100</span></div>
+        <div id="timer-display"><span id="timer">0:00</span></div>
+        <div style="text-align: right;">
+            BOSS: <span id="boss-hp">300</span>
+            <div class="hp-bar-container">
+                <div id="boss-hp-bar" class="hp-bar-fill" style="width: 100%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        
+        <div id="game-overlay" class="overlay">
+            <div id="overlay-title" class="menu-title">滑塊×消除×戰鬥</div>
+            <div id="overlay-stats"></div>
+            <button id="overlay-btn" class="menu-btn" onclick="handleOverlayClick()">START</button>
+        </div>
+    </div>
+
+    <div id="dpad-container">
+        <div class="dpad-empty"></div>
+        <div class="dpad-btn" id="btn-up">▲</div>
+        <div class="dpad-empty"></div>
+        
+        <div class="dpad-btn" id="btn-left">◀</div>
+        <div class="dpad-btn" id="btn-down">▼</div>
+        <div class="dpad-btn" id="btn-right">▶</div>
+    </div>
+
+    <div class="leaderboard-container">
+        <h3>🏆 最佳通關時間 🏆</h3>
+        <ul id="leaderboard-list"></ul>
+    </div>
+
+    <div class="instructions">
+        <ul>
+            <li>電腦可用 <b>方向鍵/WASD</b>，手機請點擊下方 <b>虛擬十字鍵</b>。</li>
+            <li><span class="safe-text">【消除】</span>：當已解鎖方塊<b>相連達 2 個以上</b>，會亮起藍框。跨越場景邊界即可消除它們並重創 BOSS！相連越多，傷害越高！</li>
+            <li><span class="danger-text">【閃避】</span>：請靈活走位，迅速移出帶有「❌」的危險預告區域！</li>
+            <li>參考左上 <b>小地圖</b>，掌握自己的所在區域吧！</li>
+        </ul>
+    </div>
+
+    <div class="creator">
+        <p>Created by <b>Rika</b> | Powered by <span class="ai-brand">Gemini</span> © 2026</p>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const tileSize = 50;
+    
+    let gameState = 'START';
+    let bossHP = 300;
+    let playerHP = 100;
+    let gameMap = [];
+    let warnings = [];
+    let lastDamageText = "";
+    let damageTextTimer = 0;
+    
+    const colors = {
+        0: '#2c3e50',   1: '#f1c40f',   2: '#2ecc71',
+        3: '#e74c3c',   4: '#9b59b6',   5: '#e67e22',
+        6: '#1abc9c',   7: '#fd79a8'
+    };
+
+    let player = { sceneX: 3, sceneY: 3, x: 9, y: 9 };
+    let gameStartTime = 0;
+    let elapsedMs = 0;
+    let nextLocalWarningTime = 0;
+    let nextRoomWarningTime = 0;
+    let nextGridWarningTime = 0;
+    let gridAttackIdx = 0;
+    const gridModes = ['vert', 'horiz', 'vert_inv', 'horiz_inv'];
+    let leaderboard = [40000, 50000, 70000];
+
+    function formatTime(ms) {
+        let totalSec = Math.floor(ms / 1000);
+        let m = Math.floor(totalSec / 60);
+        let s = totalSec % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function initMap() {
+        gameMap = [];
+        for(let sy=0; sy<4; sy++){
+            let row = [];
+            for(let sx=0; sx<4; sx++){
+                let scene = [];
+                for(let y=0; y<10; y++){
+                    let r = [];
+                    for(let x=0; x<10; x++){
+                        r.push(Math.floor(Math.random() * 7) + 11);
+                    }
+                    scene.push(r);
+                }
+                row.push(scene);
+            }
+            gameMap.push(row);
+        }
+        gameMap[player.sceneY][player.sceneX][player.y][player.x] = -1; 
+    }
+
+    function handleOverlayClick() {
+        if (gameState === 'START' || gameState === 'WIN' || gameState === 'LOSE') {
+            setupNewGame();
+        }
+    }
+
+    function setupNewGame() {
+        bossHP = 300;
+        playerHP = 100;
+        warnings = [];
+        lastDamageText = "";
+        damageTextTimer = 0;
+        gridAttackIdx = 0;
+        elapsedMs = 0;
+        player = { sceneX: 3, sceneY: 3, x: 9, y: 9 };
+        
+        document.getElementById('boss-hp').innerText = bossHP;
+        document.getElementById('boss-hp-bar').style.width = '100%';
+        document.getElementById('player-hp').innerText = playerHP;
+        document.getElementById('timer').innerText = "0:00";
+        document.getElementById('game-overlay').style.display = 'none';
+        document.getElementById('overlay-stats').style.display = 'none';
+        
+        initMap();
+        
+        let now = Date.now();
+        gameStartTime = now;
+        nextLocalWarningTime = now + 7000;
+        nextRoomWarningTime = now + 10000;
+        nextGridWarningTime = now + 3000;
+
+        gameState = 'PLAYING';
+    }
+
+    function unprotectCluster(startX, startY, scene) {
+        let startVal = scene[startY][startX];
+        if (startVal <= 0) return;
+        
+        let isProtected = startVal > 10;
+        let baseColor = isProtected ? startVal - 10 : startVal;
+        
+        let visited = Array.from({length: 10}, () => Array(10).fill(false));
+        let q = [[startX, startY]];
+        visited[startY][startX] = true;
+
+        while(q.length > 0) {
+            let [cx, cy] = q.shift();
+            scene[cy][cx] = baseColor; 
+
+            let dirs = [[1,0], [-1,0], [0,1], [0,-1]];
+            for(let d of dirs){
+                let nx = cx + d[0], ny = cy + d[1];
+                if(nx>=0 && nx<10 && ny>=0 && ny<10){
+                    if(!visited[ny][nx]) {
+                        let neighborVal = scene[ny][nx];
+                        if (neighborVal === baseColor || neighborVal === baseColor + 10) {
+                            visited[ny][nx] = true;
+                            q.push([nx, ny]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    function evaluateScene(sx, sy) {
+        let scene = gameMap[sy][sx];
+        let visited = Array.from({length: 10}, () => Array(10).fill(false));
+        let totalDamage = 0;
+        let blocksToClear = [];
+
+        for(let y=0; y<10; y++){
+            for(let x=0; x<10; x++){
+                let color = scene[y][x];
+                if(color > 0 && color <= 7 && !visited[y][x]) {
+                    let cluster = [];
+                    let q = [[x, y]];
+                    visited[y][x] = true;
+                    
+                    while(q.length > 0){
+                        let [cx, cy] = q.shift();
+                        cluster.push([cx, cy]);
+                        let dirs = [[1,0], [-1,0], [0,1], [0,-1]];
+                        for(let d of dirs){
+                            let nx = cx + d[0], ny = cy + d[1];
+                            if(nx>=0 && nx<10 && ny>=0 && ny<10){
+                                if(!visited[ny][nx] && scene[ny][nx] === color){
+                                    visited[ny][nx] = true;
+                                    q.push([nx, ny]);
+                                }
+                            }
+                        }
+                    }
+                    
+                    let n = cluster.length;
+                    if(n >= 2){
+                        let mult = 1;
+                        if(n >= 6 && n <= 9) mult = 2;
+                        else if(n >= 10 && n <= 13) mult = 3;
+                        else if(n >= 14) mult = 5;
+                        
+                        totalDamage += (n * mult);
+                        blocksToClear.push(...cluster);
+                    }
+                }
+            }
+        }
+
+        blocksToClear.forEach(([cx, cy]) => { scene[cy][cx] = 0; });
+
+        if(totalDamage > 0) {
+            bossHP -= totalDamage;
+            if(bossHP < 0) bossHP = 0;
+            document.getElementById('boss-hp').innerText = bossHP;
+            document.getElementById('boss-hp-bar').style.width = (bossHP / 300 * 100) + '%';
+            
+            lastDamageText = `Combo! 造成 ${totalDamage} 傷害!`;
+            damageTextTimer = Date.now() + 2000;
+        }
+    }
+
+    function move(dx, dy) {
+        if(gameState !== 'PLAYING') return;
+
+        let nx = player.x + dx;
+        let ny = player.y + dy;
+
+        if (nx < 0 || nx >= 10 || ny < 0 || ny >= 10) {
+            let nsx = player.sceneX;
+            let nsy = player.sceneY;
+            let newX = nx;
+            let newY = ny;
+
+            if (nx < 0) { nsx--; newX = 9; }
+            else if (nx >= 10) { nsx++; newX = 0; }
+            if (ny < 0) { nsy--; newY = 9; }
+            else if (ny >= 10) { nsy++; newY = 0; }
+
+            if (nsx >= 0 && nsx < 4 && nsy >= 0 && nsy < 4) {
+                let oldScene = gameMap[player.sceneY][player.sceneX];
+                let newScene = gameMap[nsy][nsx];
+                
+                let targetBlock = newScene[newY][newX];
+                newScene[newY][newX] = -1; 
+                oldScene[player.y][player.x] = targetBlock;
+
+                if (targetBlock > 0) {
+                    unprotectCluster(player.x, player.y, oldScene);
+                }
+
+                evaluateScene(player.sceneX, player.sceneY);
+
+                player.sceneX = nsx; player.sceneY = nsy;
+                player.x = newX; player.y = newY;
+            }
+        } else {
+            let scene = gameMap[player.sceneY][player.sceneX];
+            let temp = scene[ny][nx];
+            scene[ny][nx] = -1;
+            scene[player.y][player.x] = temp;
+            
+            if (temp > 0) {
+                unprotectCluster(player.x, player.y, scene);
+            }
+            
+            player.x = nx; player.y = ny;
+        }
+    }
+
+    // ⌨️ 電腦鍵盤事件
+    let keyLocked = false;
+    window.addEventListener('keydown', (e) => {
+        if(keyLocked || gameState !== 'PLAYING') return;
+        
+        let dx = 0, dy = 0;
+        if(e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') dy = -1;
+        if(e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') dy = 1;
+        if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') dx = -1;
+        if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dx = 1;
+
+        if(dx !== 0 || dy !== 0) {
+            e.preventDefault();
+            keyLocked = true;
+            move(dx, dy);
+            setTimeout(() => keyLocked = false, 70);
+        }
+    });
+
+    // 🕹️ 手機虛擬按鍵事件綁定（使用 pointerdown 達到零延遲反應）
+    function setupMobileControls() {
+        const bindButton = (id, dx, dy) => {
+            const btn = document.getElementById(id);
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault(); // 防止手機瀏覽器的預設點擊干擾
+                if (gameState === 'PLAYING') {
+                    move(dx, dy);
+                }
+            });
+        };
+        bindButton('btn-up', 0, -1);
+        bindButton('btn-down', 0, 1);
+        bindButton('btn-left', -1, 0);
+        bindButton('btn-right', 1, 0);
+    }
+
+    function renderLeaderboard() {
+        const list = document.getElementById('leaderboard-list');
+        list.innerHTML = '';
+        if (leaderboard.length === 0) {
+            list.innerHTML = '<li style="color: #7f8c8d; justify-content: center;">暫無通關紀錄</li>';
+            return;
+        }
+        const medals = ['🥇', '🥈', '🥉'];
+        leaderboard.forEach((t, index) => {
+            let li = document.createElement('li');
+            li.innerHTML = `<span>${medals[index]} 第 ${index + 1} 名</span> <span>${formatTime(t)}</span>`;
+            list.appendChild(li);
+        });
+    }
+
+    function updateLeaderboard(newTimeMs) {
+        leaderboard.push(newTimeMs);
+        leaderboard.sort((a, b) => a - b);
+        if (leaderboard.length > 3) leaderboard.pop();
+        renderLeaderboard();
+    }
+
+    function endGame(state) {
+        gameState = state;
+        let statsHtml = `總花費時間: <b>${formatTime(elapsedMs)}</b><br>`;
+        if (state === 'WIN') {
+            statsHtml += `玩家剩餘 HP: <b>${playerHP}</b>`;
+            updateLeaderboard(elapsedMs);
+            showEndScreen("YOU WIN!", "#f1c40f", statsHtml);
+        } else {
+            statsHtml += `Boss 剩餘 HP: <b style="color:#e74c3c;">${bossHP}</b>`;
+            showEndScreen("GAME OVER", "#e74c3c", statsHtml);
+        }
+    }
+
+    function loop() {
+        let now = Date.now();
+
+        if(gameState === 'PLAYING') {
+            elapsedMs = now - gameStartTime;
+            document.getElementById('timer').innerText = formatTime(elapsedMs);
+
+            if (now >= nextLocalWarningTime) {
+                warnings.push({
+                    type: 'local',
+                    sceneX: player.sceneX, sceneY: player.sceneY,
+                    x: player.x, y: player.y,
+                    executeAt: now + 3000
+                });
+                nextLocalWarningTime += 10000;
+            }
+
+            if (now >= nextRoomWarningTime) {
+                warnings.push({
+                    type: 'room',
+                    sceneX: player.sceneX, sceneY: player.sceneY,
+                    executeAt: now + 5000
+                });
+                nextRoomWarningTime += 15000; 
+            }
+
+            if (now >= nextGridWarningTime) {
+                let mode = gridModes[gridAttackIdx % 4];
+                warnings.push({
+                    type: 'grid',
+                    mode: mode,
+                    executeAt: now + 1000
+                });
+                gridAttackIdx++;
+                nextGridWarningTime += 2000;
+            }
+
+            for (let i = warnings.length - 1; i >= 0; i--) {
+                let w = warnings[i];
+                if (now >= w.executeAt) {
+                    let hit = false;
+                    
+                    if (w.type === 'local' && player.sceneX === w.sceneX && player.sceneY === w.sceneY) {
+                        if (Math.abs(player.x - w.x) <= 1 && Math.abs(player.y - w.y) <= 1) hit = true;
+                    } 
+                    else if (w.type === 'room' && player.sceneX === w.sceneX && player.sceneY === w.sceneY) {
+                        hit = true;
+                    }
+                    else if (w.type === 'grid') {
+                        if (w.mode === 'vert' && player.x % 2 === 0) hit = true;
+                        if (w.mode === 'vert_inv' && player.x % 2 === 1) hit = true;
+                        if (w.mode === 'horiz' && player.y % 2 === 0) hit = true;
+                        if (w.mode === 'horiz_inv' && player.y % 2 === 1) hit = true;
+                    }
+
+                    if(hit) {
+                        let dmg = 10;
+                        if(w.type === 'room') dmg = 30;
+                        if(w.type === 'local') dmg = 15;
+                        
+                        playerHP -= dmg;
+                        if(playerHP < 0) playerHP = 0;
+                        document.getElementById('player-hp').innerText = playerHP;
+                        
+                        lastDamageText = `💥 受到傷害! -${dmg} HP`;
+                        damageTextTimer = now + 1500;
+                        
+                        if(playerHP <= 0) {
+                            endGame('LOSE');
+                        }
+                    }
+                    warnings.splice(i, 1);
+                }
+            }
+
+            if(bossHP <= 0 && gameState === 'PLAYING') {
+                endGame('WIN');
+            }
+        }
+
+        draw(now);
+        requestAnimationFrame(loop);
+    }
+
+    function showEndScreen(text, color, statsHtml) {
+        document.getElementById('overlay-title').innerText = text;
+        document.getElementById('overlay-title').style.color = color;
+        
+        let statsElem = document.getElementById('overlay-stats');
+        statsElem.innerHTML = statsHtml;
+        statsElem.style.display = 'block';
+
+        document.getElementById('overlay-btn').innerText = "RESTART";
+        document.getElementById('game-overlay').style.display = 'flex';
+    }
+
+    function getEliminatableMask(scene) {
+        let mask = Array.from({length: 10}, () => Array(10).fill(false));
+        let visited = Array.from({length: 10}, () => Array(10).fill(false));
+
+        for(let y=0; y<10; y++){
+            for(let x=0; x<10; x++){
+                let val = scene[y][x];
+                if(val > 0 && val <= 7 && !visited[y][x]) {
+                    let cluster = [];
+                    let q = [[x, y]];
+                    visited[y][x] = true;
+                    
+                    while(q.length > 0){
+                        let [cx, cy] = q.shift();
+                        cluster.push([cx, cy]);
+                        let dirs = [[1,0], [-1,0], [0,1], [0,-1]];
+                        for(let d of dirs){
+                            let nx = cx + d[0], ny = cy + d[1];
+                            if(nx>=0 && nx<10 && ny>=0 && ny<10){
+                                if(!visited[ny][nx] && scene[ny][nx] === val){
+                                    visited[ny][nx] = true;
+                                    q.push([nx, ny]);
+                                }
+                            }
+                        }
+                    }
+                    if(cluster.length >= 2) {
+                        cluster.forEach(([cx, cy]) => { mask[cy][cx] = true; });
+                    }
+                }
+            }
+        }
+        return mask;
+    }
+
+    function draw(now) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (gameState === 'START') {
+            ctx.fillStyle = '#34495e';
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            return;
+        }
+
+        let scene = gameMap[player.sceneY][player.sceneX];
+        let eliminatable = getEliminatableMask(scene);
+
+        for(let y=0; y<10; y++){
+            for(let x=0; x<10; x++){
+                let val = scene[y][x];
+                if(val > 0) {
+                    let isProtected = val > 10;
+                    let cIdx = isProtected ? val - 10 : val; 
+
+                    ctx.fillStyle = colors[cIdx];
+                    ctx.fillRect(x*tileSize + 2, y*tileSize + 2, tileSize - 4, tileSize - 4);
+                    
+                    if (!isProtected && eliminatable[y][x]) {
+                        ctx.fillStyle = 'rgba(0, 210, 255, 0.2)'; 
+                        ctx.fillRect(x*tileSize + 2, y*tileSize + 2, tileSize - 4, tileSize - 4);
+                        ctx.strokeStyle = '#00d2ff'; 
+                        ctx.lineWidth = 4;
+                        ctx.strokeRect(x*tileSize + 4, y*tileSize + 4, tileSize - 8, tileSize - 8);
+                    }
+                }
+                if(val === -1) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(x*tileSize + tileSize/2, y*tileSize + tileSize/2, tileSize/2 - 6, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.fillRect(x*tileSize + 16, y*tileSize + 16, 4, 4);
+                    ctx.fillRect(x*tileSize + 30, y*tileSize + 16, 4, 4);
+                }
+            }
+        }
+
+        const drawDangerX = (col, row, strokeColor = 'rgba(255, 50, 50, 0.9)') => {
+            let pad = 12;
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(col * tileSize + pad, row * tileSize + pad);
+            ctx.lineTo(col * tileSize + tileSize - pad, row * tileSize + tileSize - pad);
+            ctx.moveTo(col * tileSize + tileSize - pad, row * tileSize + pad);
+            ctx.lineTo(col * tileSize + pad, row * tileSize + tileSize - pad);
+            ctx.stroke();
+        };
+
+        warnings.forEach(w => {
+            if (w.type === 'grid') {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+                if (w.mode === 'vert' || w.mode === 'vert_inv') {
+                    let startCol = (w.mode === 'vert') ? 0 : 1;
+                    for (let x = startCol; x < 10; x += 2) {
+                        ctx.fillRect(x * tileSize, 0, tileSize, canvas.height);
+                        for (let y = 0; y < 10; y++) { drawDangerX(x, y); }
+                    }
+                } else if (w.mode === 'horiz' || w.mode === 'horiz_inv') {
+                    let startRow = (w.mode === 'horiz') ? 0 : 1;
+                    for (let y = startRow; y < 10; y += 2) {
+                        ctx.fillRect(0, y * tileSize, canvas.width, tileSize);
+                        for (let x = 0; x < 10; x++) { drawDangerX(x, y); }
+                    }
+                }
+            }
+            if(w.sceneX === player.sceneX && w.sceneY === player.sceneY) {
+                if(w.type === 'local') {
+                    let startCol = Math.max(0, w.x - 1);
+                    let startRow = Math.max(0, w.y - 1);
+                    let endCol = Math.min(9, w.x + 1);
+                    let endRow = Math.min(9, w.y + 1);
+                    let drawStartX = startCol * tileSize;
+                    let drawStartY = startRow * tileSize;
+                    let drawWidth = (endCol - startCol + 1) * tileSize;
+                    let drawHeight = (endRow - startRow + 1) * tileSize;
+
+                    ctx.strokeStyle = 'rgba(241, 196, 15, 0.9)';
+                    ctx.lineWidth = 5;
+                    ctx.strokeRect(drawStartX, drawStartY, drawWidth, drawHeight);
+                    ctx.fillStyle = 'rgba(241, 196, 15, 0.3)';
+                    ctx.fillRect(drawStartX, drawStartY, drawWidth, drawHeight);
+
+                    for(let c = startCol; c <= endCol; c++) {
+                        for(let r = startRow; r <= endRow; r++) { drawDangerX(c, r, 'rgba(241, 196, 15, 0.9)'); }
+                    }
+                } 
+                else if (w.type === 'room') {
+                    ctx.strokeStyle = '#e74c3c';
+                    ctx.lineWidth = 12;
+                    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'rgba(231, 76, 60, 0.2)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    for(let c = 0; c < 10; c++) {
+                        for(let r = 0; r < 10; r++) { drawDangerX(c, r, 'rgba(255, 50, 50, 0.6)'); }
+                    }
+                }
+            }
+        });
+
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(10, 10, 60, 60);
+        for(let sy=0; sy<4; sy++){
+            for(let sx=0; sx<4; sx++){
+                if(sx === player.sceneX && sy === player.sceneY) { ctx.fillStyle = '#ffffff'; } 
+                else { ctx.fillStyle = '#7f8c8d'; }
+                ctx.fillRect(10 + sx*14 + 2, 10 + sy*14 + 2, 10, 10);
+            }
+        }
+
+        if (now < damageTextTimer) {
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 22px Arial';
+            ctx.shadowColor = "black";
+            ctx.shadowBlur = 6;
+            ctx.fillText(lastDamageText, canvas.width/2 - 100, 40);
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    renderLeaderboard();
+    setupMobileControls();
+    requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
