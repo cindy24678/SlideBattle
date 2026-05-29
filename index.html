@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>滑塊×消除×戰鬥 Prototype v11</title>
+    <title>滑塊×消除×戰鬥 Prototype v12</title>
     <style>
         body {
             background-color: #2c3e50;
@@ -116,27 +116,35 @@
             border-radius: 20px;
         }
         
+        /* 🕹️ 【修改處 1】雙手橫向按鍵外框：改為左右分開的 Flex 排版 */
         #dpad-container {
-            display: grid;
-            grid-template-columns: repeat(3, 75px);
-            grid-template-rows: repeat(2, 75px);
-            gap: 12px;
-            margin-top: 15px;
-            justify-content: center;
+            display: flex;
+            justify-content: space-between; /* 讓左右兩組按鍵各自靠邊，中間留下明顯空白 */
             width: 100%;
+            max-width: 500px;
+            margin-top: 20px;
+            padding: 0 5px;
+            box-sizing: border-box;
             user-select: none;
             -webkit-user-select: none;
+        }
+        /* 左右按鍵小群組 */
+        .dpad-group {
+            display: flex;
+            gap: 15px; /* 按鍵與按鍵之間的間距 */
         }
         .dpad-btn {
             background-color: #34495e;
             color: white;
             border: 2px solid #7f8c8d;
-            border-radius: 15px;
-            font-size: 28px;
+            border-radius: 18px;
+            font-size: 30px;
+            width: 75px;
+            height: 75px;
             display: flex;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 5px #2c3e50;
+            box-shadow: 0 6px #2c3e50;
             cursor: pointer;
             touch-action: manipulation; 
         }
@@ -144,10 +152,7 @@
             background-color: #1abc9c;
             border-color: #16a085;
             transform: translateY(4px);
-            box-shadow: 0 1px #2c3e50;
-        }
-        .dpad-empty {
-            visibility: hidden;
+            box-shadow: 0 2px #2c3e50;
         }
 
         .leaderboard-container {
@@ -236,12 +241,14 @@
     </div>
 
     <div id="dpad-container">
-        <div class="dpad-empty"></div>
-        <div class="dpad-btn" id="btn-up">▲</div>
-        <div class="dpad-empty"></div>
-        <div class="dpad-btn" id="btn-left">◀</div>
-        <div class="dpad-btn" id="btn-down">▼</div>
-        <div class="dpad-btn" id="btn-right">▶</div>
+        <div class="dpad-group">
+            <div class="dpad-btn" id="btn-left">◀</div>
+            <div class="dpad-btn" id="btn-down">▼</div>
+        </div>
+        <div class="dpad-group">
+            <div class="dpad-btn" id="btn-up">▲</div>
+            <div class="dpad-btn" id="btn-right">▶</div>
+        </div>
     </div>
 
     <div class="leaderboard-container">
@@ -251,10 +258,10 @@
 
     <div class="instructions">
         <ul>
-            <li>電腦可用 <b>方向鍵/WASD</b>，手機請點擊下方 <b>虛擬十字鍵</b>。</li>
-            <li><span class="safe-text">【消除】</span>：當已解鎖方塊<b>相連達 2 個以上</b>，會亮起藍框。跨越邊界即可消除它們並重創 BOSS！相連越多，傷害越高！</li>
+            <li>電腦可用 <b>方向鍵/WASD</b>，手機請使用下方 <b>雙手虛擬按鍵（左手：◀▼ / 右手：▲▶）</b>。</li>
+            <li><span class="safe-text">【消除】</span>：當已解鎖方塊<b>相連達 2 個以上</b>，會亮起藍框。跨越邊界即可消除它們並重創 BOSS！</li>
             <li><span class="danger-text">【閃避】</span>：請靈活走位，迅速移出帶有「❌」的危險預告區域！</li>
-            <li>參考畫面左上 <b>小地圖</b>，掌握自己的所在區域吧！</li>
+            <li>出現 <span class="danger-text">全場地攻擊</span>時，盡快逃出房間吧！可參考畫面左上 <b>小地圖</b>，掌握自己的所在區域！</li>
         </ul>
     </div>
 
@@ -290,8 +297,7 @@
     let gridAttackIdx = 0;
     const gridModes = ['vert', 'horiz', 'vert_inv', 'horiz_inv'];
 
-    // 💾 【修改處 1】初始化排行榜：嘗試從本機讀取，若沒有則使用預設值
-    let leaderboard = JSON.parse(localStorage.getItem('rika_game_leaderboard')) || [40000, 80000, 120000];
+    let leaderboard = JSON.parse(localStorage.getItem('rika_game_leaderboard')) || [60000, 80000, 120000];
 
     function formatTime(ms) {
         let totalSec = Math.floor(ms / 1000);
@@ -543,7 +549,6 @@
         leaderboard.sort((a, b) => a - b);
         if (leaderboard.length > 3) leaderboard.pop();
         
-        // 💾 【修改處 2】同步寫入本機硬碟保險箱
         localStorage.setItem('rika_game_leaderboard', JSON.stringify(leaderboard));
         
         renderLeaderboard();
@@ -785,14 +790,15 @@
                         for(let r = startRow; r <= endRow; r++) { drawDangerX(c, r, 'rgba(241, 196, 15, 0.9)'); }
                     }
                 } 
+                /* 👁️ 【修改處 3】微調全場地攻擊（Room Attack）的透明度，從 0.2 降到 0.08，❌ 的濃度也減半，讓縱橫條紋更容易辨識 */
                 else if (w.type === 'room') {
                     ctx.strokeStyle = '#e74c3c';
                     ctx.lineWidth = 12;
                     ctx.strokeRect(0, 0, canvas.width, canvas.height);
-                    ctx.fillStyle = 'rgba(231, 76, 60, 0.2)';
+                    ctx.fillStyle = 'rgba(231, 76, 60, 0.08)'; /* 變透明 */
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     for(let c = 0; c < 10; c++) {
-                        for(let r = 0; r < 10; r++) { drawDangerX(c, r, 'rgba(255, 50, 50, 0.6)'); }
+                        for(let r = 0; r < 10; r++) { drawDangerX(c, r, 'rgba(255, 50, 50, 0.25)'); } /* ❌ 淡化 */
                     }
                 }
             }
